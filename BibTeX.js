@@ -84,7 +84,7 @@ function detectImport() {
 //%a = first listed creator surname
 //%y = year
 //%t = first word of title
-var citeKeyFormat = "%a_%t_%y";
+var citeKeyFormat = "%a%y_%t";
 
 var fieldMap = {
 	address:"place",
@@ -94,15 +94,15 @@ var fieldMap = {
 	series:"series",
 	title:"title",
 	volume:"volume",
-	copyright:"rights",
+	// copyright:"rights",
 	isbn:"ISBN",
 	issn:"ISSN",
-	shorttitle:"shortTitle",
+	// shorttitle:"shortTitle",
 	url:"url",
 	doi:"DOI",
-	abstract:"abstractNote",
-  	nationality: "country",
-    language:"language",
+	// abstract:"abstractNote",
+  	// nationality: "country",
+    // language:"language",
   	assignee:"assignee"
 };
 
@@ -1211,6 +1211,36 @@ var numberRe = /^[0-9]+/;
 var citeKeyTitleBannedRe = /\b(a|an|the|some|from|on|in|to|of|do|with|der|die|das|ein|eine|einer|eines|einem|einen|un|une|la|le|l\'|el|las|los|al|uno|una|unos|unas|de|des|del|d\')(\s+|\b)|(<\/?(i|b|sup|sub|sc|span style=\"small-caps\"|span)>)/g;
 var citeKeyConversionsRe = /%([a-zA-Z])/;
 
+// https://stackoverflow.com/questions/1026069/how-do-i-make-the-first-letter-of-a-string-uppercase-in-javascript
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+}
+
+var citeKeyConversions = {
+    "a":function (flags, item) {
+        if (item.creators && item.creators[0] && item.creators[0].lastName) {
+            // return item.creators[0].lastName.toLowerCase().replace(/ /g,"_").replace(/,/g,"");
+            return capitalizeFirstLetter(item.creators[0].lastName).replace(/ /g,"_").replace(/,/g,"");
+        }
+        return "noauthor";
+    },
+    "y":function (flags, item) {
+        if (item.date) {
+            var date = Zotero.Utilities.strToDate(item.date);
+            if (date.year && numberRe.test(date.year)) {
+                return date.year;
+            }
+        }
+        return "nodate";
+    },
+    "t":function (flags, item) {
+        if (item["title"]) {
+            return item["title"].toLowerCase().replace(citeKeyTitleBannedRe, "").split(/\s+/g)[0];
+        }
+        return "notitle";
+    }
+};
+
 function buildCiteKey (item, extraFields, citekeys) {
 	if (extraFields) {
 		const citationKey = extraFields.findIndex(field => field.field && field.value && field.field.toLowerCase() === 'citation key');
@@ -1327,8 +1357,8 @@ function doExport() {
 		
 		// create a unique citation key
 		var extraFields = item.extra ? parseExtraFields(item.extra) : null;
-		var citekey = buildCiteKey(item, extraFields, citekeys);
-		
+	    var citekey = capitalizeFirstLetter(buildCiteKey(item, extraFields, citekeys));
+
 		// write citation key
 		Zotero.write((first ? "" : "\n\n") + "@"+type+"{"+citekey);
 		first = false;
@@ -1342,10 +1372,10 @@ function doExport() {
 		if (item.reportNumber || item.issue || item.seriesNumber || item.patentNumber) {
 			writeField("number", item.reportNumber || item.issue || item.seriesNumber|| item.patentNumber);
 		}
-		if (item.accessDate){
-			var accessYMD = item.accessDate.replace(/\s*\d+:\d+:\d+/, "");
-			writeField("urldate", accessYMD);
-		}
+		// if (item.accessDate){
+		// 	var accessYMD = item.accessDate.replace(/\s*\d+:\d+:\d+/, "");
+		// 	writeField("urldate", accessYMD);
+		// }
 		
 		if (item.publicationTitle) {
 			if (item.itemType == "bookSection" || item.itemType == "conferencePaper") {
@@ -1442,18 +1472,18 @@ function doExport() {
 					i--;
 				}
 			}
-			var extra = extraFieldsToString(extraFields); // Make sure we join exactly with what we split
-			if (extra) writeField("note", extra);
+			// var extra = extraFieldsToString(extraFields); // Make sure we join exactly with what we split
+			// if (extra) writeField("note", extra);
 		}
 	
-		if (item.tags && item.tags.length) {
-			var tagString = "";
-			for (var i in item.tags) {
-				var tag = item.tags[i];
-				tagString += ", "+tag.tag;
-			}
-			writeField("keywords", tagString.substr(2));
-		}
+		// if (item.tags && item.tags.length) {
+		// 	var tagString = "";
+		// 	for (var i in item.tags) {
+		// 		var tag = item.tags[i];
+		// 		tagString += ", "+tag.tag;
+		// 	}
+		// 	writeField("keywords", tagString.substr(2));
+		// }
 		
 		if (item.pages) {
 			writeField("pages", item.pages.replace(/[-\u2012-\u2015\u2053]+/g,"--"));
@@ -1501,9 +1531,9 @@ function doExport() {
 						+ ":" + encodeFilePathComponent(attachment.mimeType);
 				}
 			}
-            if (attachmentString) {
-				writeField("file", attachmentString.substr(1));
-			}
+            // if (attachmentString) {
+			// 	writeField("file", attachmentString.substr(1));
+			// }
 		}
 		
 		Zotero.write("\n}");
